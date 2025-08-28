@@ -22,15 +22,15 @@ if "payload" in resp:
     print("\n== PAYLOAD ==")
     print(json.dumps(resp["payload"], indent=2))
 
-u = tool._run(
-    action = "update_ticket",
-    ticket_id = resp.get("ticket_id", "dryrun-0"),
-    note = "Adding details"
-)
-print("\n== UPDATE RESULT ==", u)
+# u = tool._run(
+#     action = "update_ticket",
+#     ticket_id = resp.get("ticket_id", "dryrun-0"),
+#     note = "Adding details"
+# )
+# print("\n== UPDATE RESULT ==", u)
 
-g = tool._run(
-    action = "get_ticket",
-    ticket_id = resp.get("ticket_id", "dryrun-0"),
-)
-print("\n== GET TICKET ==", g)
+# g = tool._run(
+#     action = "get_ticket",
+#     ticket_id = resp.get("ticket_id", "dryrun-0"),
+# )
+# print("\n== GET TICKET ==", g)

@@ -173,7 +173,8 @@ class HubSpotTool(BaseTool):
             raise RuntimeError("Missing HUBSPOT TOKEN")
 
         created = self._client.crm.tickets.basic_api.create(
-            simple_public_object_input = {"properties": props, "associations": associations}
+            # can change to = payload
+            simple_public_object_input_for_create = {"properties": props, "associations": associations}
         )
 
         created_at = getattr(created, "createdAt", None) or getattr(created, "createdAt", None)
@@ -199,7 +200,7 @@ class HubSpotTool(BaseTool):
 
         self._client.crm.tickets.basic_api.update(
             ticket_id = ticket_id,
-            simple_public_object_input = {"properties": {"content": note}},
+            simple_public_object_input_for_update = {"properties": {"content": note}},
         )
         return {"status": "updated", "ticket_id": p["ticket_id"]}
 
