@@ -1,0 +1,5 @@
+crewai[tools]
+openai
+hubspot-api-client
+python-dotenv
+PyYAML

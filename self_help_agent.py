@@ -12,16 +12,16 @@ class KBSearchTool(SerperDevTool):
     def run(self, *, search_query: str, **kwargs):
         # Look at KB first
         kb_query = f"site:support.vanmetrehomes.com {search_query}"
-        kb_results = super().run(search_query=kb_query, **kwargs)
+        kb_results = super().run(search_query = kb_query, **kwargs)
 
         organic = kb_results.get("organic", [])
 
         if organic:
-            kb_results["organic"] = sorted(organic, key=lambda r: r.get("position", float('inf')))
+            kb_results["organic"] = sorted(organic, key = lambda r: r.get("position", float('inf')))
             return kb_results
         else:
             # Fallback, broader search
-            return super().run(search_query=search_query, **kwargs)
+            return super().run(search_query = search_query, **kwargs)
 
 # KB file uploads
 try:
@@ -30,18 +30,18 @@ try:
     from langchain.vectorstores import Chroma
 
     class DocumentSearchTool:
-        def __init__(self, docs_path="./data"):
-            loader = DirectoryLoader(docs_path, glob="**/*.pdf")
+        def __init__(self, docs_path = "./data"):
+            loader = DirectoryLoader(docs_path, glob = "**/*.pdf")
             docs = loader.load()
             if not docs:
                 self.vectorstore = None
                 return
-            self.vectorstore = Chroma.from_documents(docs, embedding=OpenAIEmbeddings())
+            self.vectorstore = Chroma.from_documents(docs, embedding = OpenAIEmbeddings())
         
         def run(self, query: str, k: int = 4):
             if not getattr(self, "vectorstore", None):
                 return []
-            results = self.vectorstore.similarity_search(query, k=k)
+            results = self.vectorstore.similarity_search(query, k = k)
             return [{"page_content": doc.page_content, "metadata": doc.metadata} for doc in results]
 except ImportError:
     DocumentSearchTool = None
@@ -63,34 +63,34 @@ class HomeownerHelpAgent:
         
         # Create CrewAI Agent
         self.agent = Agent(
-            role="Homeowner Knowledge Assistant",
-            goal="Answer homeowner warranty/maintenance questions using Van Metre's support site and uploaded documents",
-            backstory=(
+            role = "Homeowner Knowledge Assistant",
+            goal = "Answer homeowner warranty/maintenance questions using Van Metre's support site and uploaded documents",
+            backstory = (
                 "Use KBSearchTool to fetch relevant support articles first. "
                 "If a question requires document context, use DocumentSearchTool. "
                 "Finally, synthesize all results into a concise, step-by-step answer, citing URLs."
             ),
-            tools=self.tools,
-            verbose=True
+            tools = self.tools,
+            verbose = True
         )
     
     def run(self, question: str) -> str:
         # Fetch from web
         task_search_web = Task(
-            description=f'Use KBSearchTool to search for: "{question}"',
-            expected_output="A JSON array of web KB snippets with title, link, and snippet.",
-            agent=self.agent,
-            verbose=False
+            description = f'Use KBSearchTool to search for: "{question}"',
+            expected_output = "A JSON array of web KB snippets with title, link, and snippet.",
+            agent = self.agent,
+            verbose = False
         )
         tasks = [task_search_web]
 
         # Docs, if available
         if DocumentSearchTool and getattr(self, 'doc_tool', None) and self.doc_tool.vectorstore:
             task_search_doc = Task(
-                description=f'Use DocumentSearchTool to search uploaded documents for: "{question}"',
-                expected_output="A JSON array of document snippets with page_content and metadata.",
-                agent=self.agent,
-                verbose=False
+                description = f'Use DocumentSearchTool to search uploaded documents for: "{question}"',
+                expected_output = "A JSON array of document snippets with page_content and metadata.",
+                agent = self.agent,
+                verbose = False
             )
             tasks.append(task_search_doc)
 
@@ -105,13 +105,13 @@ class HomeownerHelpAgent:
         )
 
         task_summarize = Task(
-            description=desc,
-            expected_output=f"A numbered list of steps answering: '{question}', with URL citations.",
-            agent=self.agent,
-            verbose=True
+            description = desc,
+            expected_output = f"A numbered list of steps answering: '{question}', with URL citations.",
+            agent = self.agent,
+            verbose = True
         )
         tasks.append(task_summarize)
 
-        crew = Crew(agents=[self.agent], tasks=tasks, verbose=True)
+        crew = Crew(agents=[self.agent], tasks = tasks, verbose = True)
 
         return crew.kickoff()
