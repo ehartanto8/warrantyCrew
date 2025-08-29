@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew
 from crewai_tools.tools import SerperDevTool
+from langchain_openai import OpenAIEmbeddings
 
 # env
 env_path = os.path.join(os.path.dirname(__file__), '.env')

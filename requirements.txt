@@ -1,5 +1,26 @@
-crewai[tools]
-openai
-hubspot-api-client
-python-dotenv
-PyYAML
+# --- Core agents ---
+crewai==0.165.1
+crewai-tools==0.62.3
+
+# --- HubSpot SDK ---
+hubspot-api-client>=8.0.0,<12.0.0
+
+# --- Web API ---
+fastapi>=0.110,<0.115
+uvicorn[standard]>=0.23,<0.30
+python-dotenv>=1.0.1
+
+# --- Pydantic (v2) ---
+pydantic>=2.6,<3
+email-validator>=2.1.0
+
+# --- LangChain & RAG pieces (v0.2 line) ---
+langchain>=0.2,<0.3
+langchain-community>=0.2,<0.3
+langchain-openai>=0.2.1,<0.3.0
+
+# --- Vector store (CrewAI tools expect this pin) ---
+chromadb==0.5.23
+
+# --- OpenAI SDK (fits crewai, crewai-tools, stagehand) ---
+openai==1.99.5
