@@ -17,15 +17,11 @@ email-validator>=2.1.0
 # --- LangChain & RAG pieces (v0.2 line) ---
 langchain==0.2.17
 langchain-community==0.2.17
-langchain-openai>=0.2.1,<0.3.0
+langchain-openai==0.2.17
 
 # --- Vector store (CrewAI tools expect this pin) ---
 chromadb==0.5.23
 
 # --- OpenAI SDK (fits crewai, crewai-tools, stagehand) ---
 openai==1.99.5
-
-fastapi
-uvicorn
-pydantic
 
