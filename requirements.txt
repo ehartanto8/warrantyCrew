@@ -15,8 +15,8 @@ pydantic>=2.6,<3
 email-validator>=2.1.0
 
 # --- LangChain & RAG pieces (v0.2 line) ---
-langchain>=0.2,<0.3
-langchain-community>=0.2,<0.3
+langchain==0.2.17
+langchain-community==0.2.17
 langchain-openai>=0.2.1,<0.3.0
 
 # --- Vector store (CrewAI tools expect this pin) ---
