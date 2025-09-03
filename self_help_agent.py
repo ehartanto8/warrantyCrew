@@ -1,7 +1,10 @@
 import os
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew
-from crewai_tools.tools import SerperDevTool
+try:
+    from crewai_tools import SerperDevTool
+except ImportError:
+    from crewai_tools.tools import SerperDevTool
 from langchain_openai import OpenAIEmbeddings
 
 # env

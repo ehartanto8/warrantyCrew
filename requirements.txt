@@ -1,13 +1,13 @@
-# CrewAI + Tools (compatible with Chroma >=0.5)
-crewai==0.120.0
+# CrewAI + Tools (version-compatible)
+crewai==0.159.0
 crewai-tools==0.62.3
 
-# LangChain line compatible with your app
+# LangChain line
 langchain==0.3.9
 langchain-community==0.3.9
 langchain-openai==0.3.2
 
-# Chroma updated to satisfy crewai 0.120.0
+# Chroma required by CrewAI 0.159+
 chromadb>=0.5.23,<0.6
 
 # Web API & others
