@@ -24,3 +24,8 @@ chromadb==0.5.23
 
 # --- OpenAI SDK (fits crewai, crewai-tools, stagehand) ---
 openai==1.99.5
+
+fastapi
+uvicorn
+pydantic
+

@@ -1,11 +1,21 @@
 import uuid
+import os
 import sys, pathlib
 from typing import Dict, Any
-from fastapi import FastAPI, HTTPException
+from urllib.error import HTTPError
+
+from fastapi import FastAPI, HTTPException, Depends, Header, status
 from api.schemas import ChatRequest, ChatResponse, ConfirmRequest
 from orchestrator import WarrantyOrchestrator, CONFIDENCE_GOOD
 from self_help_agent import HomeownerHelpAgent
 from hubspot_tool import HubSpotTool
+
+# API Key
+API_KEY = os.getenv("API_KEY")
+
+def require_api_key(x_api_key: str = Header(default = "")):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail = "API key is invalid")
 
 # Allow importing repo root modules
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
@@ -17,11 +27,11 @@ app = FastAPI(title = "Warranty Crew")
 
 orchestrator = WarrantyOrchestrator(HomeownerHelpAgent(), HubSpotTool())
 
-@app.get("/health")
+@app.get("/health", dependencies = [Depends(require_api_key)])
 def health():
     return {"ok": True}
 
-@app.post("/chat", response_model = ChatResponse)
+@app.post("/chat", dependencies = [Depends(require_api_key)], response_model = ChatResponse)
 def chat(request: ChatRequest):
     iid = str(uuid.uuid4())
 
