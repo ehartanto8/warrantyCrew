@@ -27,7 +27,7 @@ app = FastAPI(title = "Warranty Crew")
 
 orchestrator = WarrantyOrchestrator(HomeownerHelpAgent(), HubSpotTool())
 
-@app.get("/health", dependencies = [Depends(require_api_key)])
+@app.get("/health")
 def health():
     return {"ok": True}
 
