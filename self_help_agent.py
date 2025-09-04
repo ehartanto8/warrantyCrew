@@ -125,7 +125,8 @@ class HomeownerHelpAgent:
             description=desc,
             expected_output=f"A numbered list of steps answering: '{question}', with URL citations.",
             agent=self.agent,
-            verbose=True
+            verbose=True,
+            context=tasks
         )
         tasks.append(task_summarize)
 
