@@ -10,11 +10,11 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answered: bool
-    answer: Optional[str] = None
+    answer: str
     ticket_id: Optional[str] = None
     confidence: Optional[float] = None
-    need_confirmation: bool = False
-    interaction_id: Optional[str] = None
+    need_confirmation: bool = True
+    interaction_id: str
 
 class ConfirmRequest(BaseModel):
     interaction_id: str

@@ -87,9 +87,9 @@ class HomeownerHelpAgent:
                 if self.doc_tool.vectorstore:
                     self.tools.append(
                         LCTool(
-                            name="DocumentSearchTool",
-                            description="Search uploaded PDFs; input is a query string.",
-                            func=lambda q: json.dumps(self.doc_tool.run(q)),
+                            name = "DocumentSearchTool",
+                            description = "Search uploaded PDFs; input is a query string.",
+                            func = lambda q: json.dumps(self.doc_tool.run(q)),
                         )
                     )
             except Exception:
@@ -97,19 +97,19 @@ class HomeownerHelpAgent:
 
     def run(self, question: str) -> str:
         task_search_web = Task(
-            description=f'Use KBSearchTool to search for: "{question}"',
-            expected_output="A JSON array of web KB snippets with title, link, and snippet.",
-            agent=self.agent,
-            verbose=False
+            description = f'Use KBSearchTool to search for: "{question}"',
+            expected_output = "A JSON array of web KB snippets with title, link, and snippet.",
+            agent = self.agent,
+            verbose = False
         )
         tasks = [task_search_web]
 
         if DocumentSearchTool and getattr(self, 'doc_tool', None) and getattr(self.doc_tool, "vectorstore", None):
             task_search_doc = Task(
-                description=f'Use DocumentSearchTool to search uploaded documents for: "{question}"',
-                expected_output="A JSON array of document snippets with page_content and metadata.",
-                agent=self.agent,
-                verbose=False
+                description = f'Use DocumentSearchTool to search uploaded documents for: "{question}"',
+                expected_output = "A JSON array of document snippets with page_content and metadata.",
+                agent = self.agent,
+                verbose = False
             )
             tasks.append(task_search_doc)
 
@@ -122,13 +122,13 @@ class HomeownerHelpAgent:
         )
 
         task_summarize = Task(
-            description=desc,
-            expected_output=f"A numbered list of steps answering: '{question}', with URL citations.",
-            agent=self.agent,
-            verbose=True,
-            context=tasks
+            description = desc,
+            expected_output = f"A numbered list of steps answering: '{question}', with URL citations.",
+            agent = self.agent,
+            verbose = True,
+            context = tasks
         )
         tasks.append(task_summarize)
 
-        crew = Crew(agents=[self.agent], tasks=tasks, verbose=True)
+        crew = Crew(agents = [self.agent], tasks = tasks, verbose = True)
         return crew.kickoff()
