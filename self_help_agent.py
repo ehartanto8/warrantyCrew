@@ -7,9 +7,12 @@ env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(env_path)
 
 try:
-    from crewai_tools import SerperDevTool
-except ImportError:
-    from crewai_tools.tools import SerperDevTool  # pragma: no cover
+    from crewai_tools import SerperDevTool               # preferred (if it doesn't drag embedchain in)
+except Exception:
+    try:
+        from crewai_tools.tools import SerperDevTool      # older path
+    except Exception:
+        from shims.serperdevtool import SerperDevTool     # fallback: our lightweight local shim
 
 # VM Support Site
 class KBSearchTool(SerperDevTool):
