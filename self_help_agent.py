@@ -1,13 +1,34 @@
 import os
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew
+import json
+import requests
+from langchain_core.tools import Tool as LCTool
 
 # env
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(env_path)
 
-from shims.serperdevtool import SerperDevTool
+try:
+    from crewai_tools import SerperDevTool            # prefer real package
+except Exception:
+    # Minimal inline fallback if crewai_tools drags embedchain
+    class SerperDevTool:
+        def __init__(self):
+            key = os.getenv("SERPER_API_KEY")
+            if not key:
+                raise RuntimeError("SERPER_API_KEY is required")
+            self._key = key
 
+        def run(self, *, search_query: str, **kwargs):
+            r = requests.post(
+                "https://google.serper.dev/search",
+                headers={"X-API-KEY": self._key, "Content-Type": "application/json"},
+                json={"q": search_query},
+                timeout=20,
+            )
+            r.raise_for_status()
+            return r.json()
 
 # VM Support Site
 class KBSearchTool(SerperDevTool):
@@ -52,27 +73,27 @@ except ImportError:
 class HomeownerHelpAgent:
     def __init__(self):
         self.kb_tool = KBSearchTool()
-        self.tools = [self.kb_tool]
+        self.tools = [
+            LCTool(
+                name="KBSearchTool",
+                description="Search Van Metre support site via Serper; input is a query string.",
+                func=lambda q: json.dumps(self.kb_tool.run(search_query=q)),
+            )
+        ]
 
         if DocumentSearchTool:
             try:
                 self.doc_tool = DocumentSearchTool()
-                if getattr(self.doc_tool, "vectorstore", None):
-                    self.tools.append(self.doc_tool)
+                if self.doc_tool.vectorstore:
+                    self.tools.append(
+                        LCTool(
+                            name="DocumentSearchTool",
+                            description="Search uploaded PDFs; input is a query string.",
+                            func=lambda q: json.dumps(self.doc_tool.run(q)),
+                        )
+                    )
             except Exception:
                 pass
-
-        self.agent = Agent(
-            role="Homeowner Knowledge Assistant",
-            goal="Answer homeowner warranty/maintenance questions using Van Metre's support site and uploaded documents",
-            backstory=(
-                "Use KBSearchTool to fetch relevant support articles first. "
-                "If a question requires document context, use DocumentSearchTool. "
-                "Finally, synthesize all results into a concise, step-by-step answer, citing URLs."
-            ),
-            tools=self.tools,
-            verbose=True
-        )
 
     def run(self, question: str) -> str:
         task_search_web = Task(
