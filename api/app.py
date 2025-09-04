@@ -2,13 +2,15 @@ import uuid
 import os
 import sys, pathlib
 from typing import Dict, Any
-from urllib.error import HTTPError
-
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends, Header, status, Request
 from fastapi.responses import JSONResponse
 from api.schemas import ChatRequest, ChatResponse, ConfirmRequest
+import logging, json
+logging.basicConfig(level=logging.INFO)
 
 # API Key
+load_dotenv()
 API_KEY = os.getenv("API_KEY")
 
 def require_api_key(x_api_key: str = Header(default = "")):
@@ -22,6 +24,54 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 PENDING: Dict[str, Dict[str, Any]] = {}
 
 app = FastAPI(title = "Warranty Crew")
+
+def _extract_answer(payload) -> str:
+    """Be tolerant to different payload shapes and pull a readable string."""
+    # string payload
+    if isinstance(payload, str):
+        return payload.strip()
+
+    if not isinstance(payload, dict) or payload is None:
+        return ""
+
+    # common single-string fields
+    candidates = (
+        "answer", "content", "text", "message", "response",
+        "reply", "final", "final_answer", "result", "summary",
+    )
+    for k in candidates:
+        v = payload.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+
+    # OpenAI-ish shape
+    try:
+        choices = payload.get("choices")
+        if isinstance(choices, list) and choices:
+            v = choices[0].get("message", {}).get("content", "")
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+    except Exception:
+        pass
+
+    # answers: list[dict|str] or dict
+    answers_obj = payload.get("answers")
+    if isinstance(answers_obj, list):
+        for item in answers_obj:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+            if isinstance(item, dict):
+                for k in candidates:
+                    vv = item.get(k)
+                    if isinstance(vv, str) and vv.strip():
+                        return vv.strip()
+    elif isinstance(answers_obj, dict):
+        for k in candidates:
+            vv = answers_obj.get(k)
+            if isinstance(vv, str) and vv.strip():
+                return vv.strip()
+
+    return ""
 
 # Lazy orchestrator
 _orch = None
@@ -165,26 +215,42 @@ def chat(request: ChatRequest):
     raw = orch.call_self_help(request.message, ctx)
     result = _normalize_result(raw)
 
+    # LOG the raw result so we can see its real shape
+    logging.getLogger("uvicorn.error").info(
+        "orchestrator result (iid=%s): %s", iid, json.dumps(result, default=str)
+    )
+
+    # Normalize
+    answer_text = _extract_answer(result)
+    confidence = float(result.get("confidence", 0.0)) if isinstance(result, dict) else 0.0
+    resolved = bool(result.get("resolved", False)) if isinstance(result, dict) else False
+
+    # Remember for confirm
+    PENDING[iid] = {"message": request.message, "ctx": ctx, "help_res": result}
+
     # Solid answer
     if result["resolved"] or result["confidence"] >= CONFIDENCE_GOOD:
         return ChatResponse(
             answered = True,
-            answer = result["answer"],
-            confidence = result["confidence"],
+            answer = answer_text,
+            confidence = confidence,
             need_confirmation = False,
             interaction_id = iid,
             ticket_id = None,
         )
 
-    PENDING[iid] = {"message": request.message, "ctx": ctx, "help_res": result}
+    # Otherwise open a ticket and ask for confirmation
+    ticket = orch.open_ticket(request.message, result, ctx)
+    tid = ticket.get("id") or ticket.get("ticket_id") or ticket.get("hs_object_id") or str(ticket)
+
+    # Provide whatever text we could extract (may be non-empty now)
     return ChatResponse(
         answered = True,
-        answer = result["answer"],
-        answers = result["answers"],
-        confidence = result["confidence"],
+        answer = answer_text,
+        ticket_id = tid,
+        confidence = confidence,
         need_confirmation = True,
         interaction_id = iid,
-        ticket_id = None,
     )
 
 @app.post("/chat/confirm", response_model = ChatResponse)
