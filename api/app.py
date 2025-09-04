@@ -55,17 +55,93 @@ async def all_exceptions(_: Request, exc: Exception):
 
 # Normalized
 def _normalize_result(result: Any) -> Dict[str, Any]:
+    """
+    Make agent outputs predictable:
+    - returns {'answer', 'answers', 'confidence', 'resolved', 'ticket_id'}
+    - pulls text from many common fields; joins lists when needed
+    """
+    def first_nonempty_str(*vals):
+        for v in vals:
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        return ""
+
+    answers_obj = None
+    answer_text = ""
+
     if isinstance(result, dict):
-        answer = result.get("answer") or result.get("content") or result.get("text") or ""
-        return {
-            "answer": str(answer).strip(),
-            "confidence": float(result.get("confidence", 0.0)),
-            "resolved": bool(result.get("resolved", False)),
-            "ticket_id": result.get("ticket_id"),
-        }
-    if result is None:
-        return {"answer": "", "confidence": 0.0, "resolved": False, "ticket_id": ""}
-    return {"answer": str(result).strip(), "confidence": 0.0, "resolved": False, "ticket_id": None}
+        # 1) Direct string fields commonly used by LLM libs
+        answer_text = first_nonempty_str(
+            result.get("answer"),
+            result.get("content"),
+            result.get("text"),
+            result.get("message"),
+            result.get("reply"),
+            result.get("response"),
+            result.get("output"),
+            result.get("final"),
+            result.get("final_answer"),
+            result.get("result"),
+        )
+
+        # 2) OpenAI-style
+        if not answer_text:
+            try:
+                msg = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if isinstance(msg, str) and msg.strip():
+                    answer_text = msg.strip()
+            except Exception:
+                pass
+
+        # 3) LangChain / custom libs: a list under "answers"
+        if "answers" in result and result["answers"] is not None:
+            answers_obj = result["answers"]
+            # If list/dict, turn into readable text if we still don't have any
+            if not answer_text:
+                if isinstance(answers_obj, list):
+                    # pull text-ish bits out of list items
+                    parts = []
+                    for item in answers_obj:
+                        if isinstance(item, str) and item.strip():
+                            parts.append(item.strip())
+                        elif isinstance(item, dict):
+                            parts.append(first_nonempty_str(
+                                item.get("answer"), item.get("text"), item.get("content")
+                            ))
+                    answer_text = "\n\n".join([p for p in parts if p]) or ""
+                elif isinstance(answers_obj, dict):
+                    answer_text = first_nonempty_str(
+                        answers_obj.get("answer"),
+                        answers_obj.get("text"),
+                        answers_obj.get("content"),
+                    )
+
+        confidence = float(result.get("confidence", 0.0))
+        resolved = bool(result.get("resolved", False))
+        ticket_id = result.get("id") or result.get("ticket_id") or result.get("hs_object_id")
+    else:
+        # Unknown shape
+        answer_text = str(result).strip() if result is not None else ""
+        confidence = 0.0
+        resolved = False
+        ticket_id = None
+
+    # Final safety net: never return None/empty silently
+    if not answer_text and answers_obj is not None:
+        # show a compact JSON as text if you prefer a single-string `answer`
+        import json
+        try:
+            answer_text = json.dumps(answers_obj, separators=(",", ":"))
+        except Exception:
+            answer_text = str(answers_obj)
+
+    return {
+        "answer": answer_text or "",
+        "answers": answers_obj,
+        "confidence": confidence,
+        "resolved": resolved,
+        "ticket_id": ticket_id,
+    }
 
 # Check
 @app.get("/health")
@@ -104,6 +180,7 @@ def chat(request: ChatRequest):
     return ChatResponse(
         answered = True,
         answer = result["answer"],
+        answers = result["answers"],
         confidence = result["confidence"],
         need_confirmation = True,
         interaction_id = iid,
@@ -123,8 +200,9 @@ def confirm(request: ConfirmRequest):
         hr = data["help_res"]
         return ChatResponse(
             answered = True,
-            answer = hr["answer"]   ,
-            confidence = float(hr["confidence"] ),
+            answer = hr["answer"],
+            answers = hr["answers"],
+            confidence = float(hr["confidence"]),
             need_confirmation = False,
             interaction_id = request.interaction_id,
             ticket_id = None,

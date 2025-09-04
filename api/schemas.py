@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 
 class ChatRequest(BaseModel):
     message: str
@@ -11,6 +11,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answered: bool
     answer: str
+    answers: Optional[Any] = None
     ticket_id: Optional[str] = None
     confidence: Optional[float] = None
     need_confirmation: bool = True
