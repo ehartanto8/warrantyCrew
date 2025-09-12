@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from api.schemas import ChatRequest, ChatResponse, ConfirmRequest
 import logging, json
 logging.basicConfig(level=logging.INFO)
+from simple_kb import SimpleKB
 
 # API Key
 load_dotenv()
@@ -24,6 +25,9 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 PENDING: Dict[str, Dict[str, Any]] = {}
 
 app = FastAPI(title = "Warranty Crew")
+
+# Singleton
+KB = SimpleKB()
 
 def _extract_answer(payload) -> str:
     """Be tolerant to different payload shapes and pull a readable string."""
@@ -81,8 +85,16 @@ def get_orchestrator():
         from orchestrator import WarrantyOrchestrator, CONFIDENCE_GOOD
         from self_help_agent import HomeownerHelpAgent
         from hubspot_tool import HubSpotTool
+
+        agent = HomeownerHelpAgent()
+
+        if hasattr(agent, "set_kb"):
+            agent.set_kb(KB)
+        else:
+            agent.kb = KB
+
         _orch = {
-            "inst": WarrantyOrchestrator(HomeownerHelpAgent(), HubSpotTool()),
+            "inst": WarrantyOrchestrator(agent, HubSpotTool()),
             "CONFIDENCE_GOOD": float(CONFIDENCE_GOOD),
         }
     return _orch["inst"], _orch["CONFIDENCE_GOOD"]
@@ -225,6 +237,12 @@ def chat(request: ChatRequest):
     confidence = float(result.get("confidence", 0.0)) if isinstance(result, dict) else 0.0
     resolved = bool(result.get("resolved", False)) if isinstance(result, dict) else False
 
+     # Check follow-up
+    is_follow_up = (
+        isinstance(answer_text, str)
+        and answer_text.strip().lower().startswith("follow_up:")
+    )
+
     # Remember for confirm
     PENDING[iid] = {"message": request.message, "ctx": ctx, "help_res": result}
 
@@ -240,18 +258,36 @@ def chat(request: ChatRequest):
         )
 
     # Otherwise open a ticket and ask for confirmation
-    ticket = orch.open_ticket(request.message, result, ctx)
+    # Turning this off, because we want to ask the Homeowner confirmation vs. creating ticket right away
+    # ticket = orch.open_ticket(request.message, result, ctx)
+    # tid = ticket.get("id") or ticket.get("ticket_id") or ticket.get("hs_object_id") or str(ticket)
+
+    # If the agent explicitly asked a follow-up, never open a ticket yet
+    if is_follow_up:
+        return ChatResponse(
+            answered=True,
+            answer=answer_text,
+            # ticket_id = tid,
+            ticket_id=None,
+            confidence=confidence,
+            need_confirmation=True,
+            interaction_id=iid,
+        )
+
+    # Otherwise open a ticket and ask for confirmation
+    ticket = orch.open_ticet(request.message, result, ctx)
     tid = ticket.get("id") or ticket.get("ticket_id") or ticket.get("hs_object_id") or str(ticket)
 
-    # Provide whatever text we could extract (may be non-empty now)
     return ChatResponse(
-        answered = True,
-        answer = answer_text,
-        ticket_id = tid,
-        confidence = confidence,
-        need_confirmation = True,
-        interaction_id = iid,
+        answered=True,
+        answer=answer_text,
+        # ticket_id = tid,
+        ticket_id=tid,
+        confidence=confidence,
+        need_confirmation=True,
+        interaction_id=iid,
     )
+
 
 @app.post("/chat/confirm", response_model = ChatResponse)
 def confirm(request: ConfirmRequest):
@@ -285,3 +321,11 @@ def confirm(request: ConfirmRequest):
         need_confirmation = False,
         interaction_id = request.interaction_id,
     )
+
+@app.post("/admin/reindex", dependencies = [Depends(require_api_key)])
+def admin_reindex():
+    try:
+        chunks, dim = KB.reindex()
+        return { "ok": True, "chunks_indexed": chunks, "embedding_dim": dim }
+    except Exception as e:
+        raise HTTPException(status_code = 500, detail = str(e))

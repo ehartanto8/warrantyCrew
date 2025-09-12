@@ -17,3 +17,8 @@ pydantic>=2.6,<3
 email-validator>=2.1.0
 hubspot-api-client>=8.0.0,<12.0.0
 openai==1.99.5
+
+#requests>=2.31.0
+
+# DocumentSearchTool on PDFs
+#pypdf>=4.2.0

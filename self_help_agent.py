@@ -172,28 +172,46 @@ class HomeownerHelpAgent:
             kb_json = {"error": str(e)}
 
         # 2) Optional doc search
-        docs_json = []
-        if self.doc_tool:
-            try:
-                docs_json = self.doc_tool.run(question)
-            except Exception as e:
-                docs_json = [{"page_content": f"[Doc search error: {e}]", "metadata": {}}]
+        # Old langchain method
+        # docs_json = []
+        # if self.doc_tool:
+        #     try:
+        #         docs_json = self.doc_tool.run(question)
+        #     except Exception as e:
+        #         docs_json = [{"page_content": f"[Doc search error: {e}]", "metadata": {}}]
+        #
+        # kb_block   = _format_kb_block(kb_json)
+        # doc_block  = _format_doc_block(docs_json)
 
-        kb_block   = _format_kb_block(kb_json)
-        doc_block  = _format_doc_block(docs_json)
+        docs_json = []
+
+        try:
+            if hasattr(self, "kb") and self.kb:
+                docs_json = self.kb.search(question, k = 6)
+            else:
+                docs_json = []
+        except Exception as e:
+            docs_json = [{ " page_content": f"[KB error: {e}", "metadata": {}}]
+
+        kb_block = _format_kb_block(kb_json)
+        doc_block = _format_doc_block(docs_json)
 
         # 3) Summarization task—feed the results directly
         desc  = (
             f"User question: '{question}'\n\n"
+            f"Internal Documents:\n{doc_block}\n\n"
             f"Search results from support.vanmetrehomes.com:\n{kb_block}\n\n"
         )
-        if self.doc_tool:
-            desc += f"Uploaded document snippets:\n{doc_block}\n\n"
+
+        #if self.doc_tool:
+            #desc += f"Uploaded document snippets:\n{doc_block}\n\n"
 
         desc += (
             "Write a clear, numbered, step-by-step guide that answers the user's question. "
-            "When a step is derived from a specific source, append '(Source: URL or file)' at the end of that step. "
+            "Prefer steps supported by Internal Documents. "
+            "When a step is derived from a specific source, append '(Source: URL or file)'. "
             "Keep the steps concise and homeowner-friendly."
+            "If the information is insufficient or ambiguous, ask ONE specific follow-up question starting with 'Follow-up: ' and stop."
         )
 
         task_summarize = Task(
@@ -205,3 +223,32 @@ class HomeownerHelpAgent:
 
         crew = Crew(agents = [self.agent], tasks = [task_summarize], verbose = True)
         return crew.kickoff()
+
+    def _kb_hits(self, question: str, k: int = 6): # 6 -> number of KB chunks to pull (not too low and not too high)
+        try:
+            if hasattr(self, "kb") and self.kb:
+                return self.kb.search(question, k = k)
+        except Exception:
+            pass
+        return []
+
+    # Format
+    # def _fmt_docs(self, hits):
+    #     # Formatting, compact, prompt-friendly block
+    #     if not hits:
+    #         return "No internal matches."
+    #     lines = []
+    #     for h in hits[:6]:
+    #         md = h.get("metadata") or {}
+    #         src = md.get("source", "")
+    #         page = md.get("page")
+    #         score = md.get("score", 0.0)
+    #         body = (h.get("page_content") or "").strip()
+    #
+    #         if len(body) > 600:
+    #             body = body[:600] + "..."
+    #
+    #         tag = f"{src}" + (f" (page {page})" if page != "" else "")
+    #
+    #         lines.append(f"- {tag} [score {score:.3f}]\n  {body}")
+    #     return "\n".join(lines)
